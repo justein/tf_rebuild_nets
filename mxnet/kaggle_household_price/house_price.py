@@ -14,7 +14,8 @@ def net():
 
 
 # 定义评价函数，使用对数均方根误差
-def evaluate_log_loss(net, features, labels):
+def log_rmse(net, features, labels):
+    # 将小于1的值设成1，使得取对数时数值更稳定
     clipped_preds = ndarray.clip(net(features), 1, float('inf'))
     rmse = ndarray.sqrt(2 * loss(clipped_preds.log(), labels.log()).mean())
     return rmse.asscalar()
@@ -22,11 +23,11 @@ def evaluate_log_loss(net, features, labels):
 
 # 定义训练函数
 def train(net, train_features, train_labels, test_features, test_labels,
-          epochs, lr, weight_decray, batch_size):
+          epochs, lr, weight_decay, batch_size):
     train_ls, test_ls = [], []
     train_iter = gluon.data.DataLoader(gluon.data.ArrayDataset(train_features, train_labels), batch_size, shuffle=True)
     trainer = gluon.Trainer(net.collect_params(),
-                            'adam', {'learning_rate': lr, 'wd': weight_decray})
+                            'adam', {'learning_rate': lr, 'wd': weight_decay})
 
     for e in range(epochs):
         for X, y in train_iter:
@@ -34,9 +35,9 @@ def train(net, train_features, train_labels, test_features, test_labels,
                 lo = loss(net(X), y)
             lo.backward()
             trainer.step(batch_size)
-        train_ls.append(evaluate_log_loss(net, train_features, train_labels))
+        train_ls.append(log_rmse(net, train_features, train_labels))
         if test_labels is not None:
-            test_ls.append(evaluate_log_loss(net, test_features, test_labels))
+            test_ls.append(log_rmse(net, test_features, test_labels))
     return train_ls, test_ls
 
 def get_k_fold_data(k, i, X, y):
@@ -88,7 +89,7 @@ if __name__ == '__main__':
     numeric_features = all_features.dtypes[all_features.dtypes != 'object'].index
 
     all_features[numeric_features] = all_features[numeric_features].apply(
-        lambda x: ((x - x.mean()) / x.std())
+        lambda x: ((x - x.mean()) / (x.std()))
     )
 
     # 填充为na的值
@@ -114,7 +115,7 @@ if __name__ == '__main__':
 
     loss = gluon.loss.L2Loss()
 
-    k, num_epochs, lr, weight_decay, batch_size = 5, 100, 5, 0, 64
+    k, num_epochs, lr, weight_decay, batch_size = 5, 500, 5, 0, 64
     train_l, valid_l = k_fold(k, train_features, train_labels, num_epochs, lr,
                               weight_decay, batch_size)
     print('%d-fold validation: avg train rmse %f, avg valid rmse %f'
